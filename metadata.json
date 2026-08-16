@@ -1,0 +1,6 @@
+{
+  "name": "GEMI Leads",
+  "description": "B2B Lead Generator for newly registered Greek businesses from GEMI (Γ.Ε.ΜΗ.) Open Data",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
