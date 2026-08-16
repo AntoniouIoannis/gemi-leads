@@ -81,12 +81,18 @@ interface IFirestoreUserProfileRepository {
 /**
  * Production implementation of UserProfileRepository utilizing Cloud Firestore.
  */
-class FirestoreUserProfileRepository(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
-) : IFirestoreUserProfileRepository {
+class FirestoreUserProfileRepository() : IFirestoreUserProfileRepository {
 
-    private val usersCollection = firestore.collection(FirestoreCollections.USERS)
-    private val profilesCollection = firestore.collection(FirestoreCollections.BUSINESS_PROFILES)
+    private val firestore: FirebaseFirestore? by lazy {
+        try {
+            FirebaseFirestore.getInstance()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private val usersCollection by lazy { firestore?.collection(FirestoreCollections.USERS) }
+    private val profilesCollection by lazy { firestore?.collection(FirestoreCollections.BUSINESS_PROFILES) }
 
     private fun getCurrentIsoTimestamp(): String {
         return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
@@ -99,13 +105,13 @@ class FirestoreUserProfileRepository(
     // ==========================================
 
     override fun getUserFlow(userId: String): Flow<User?> = callbackFlow {
-        if (userId.isBlank()) {
+        if (userId.isBlank() || usersCollection == null) {
             trySend(null)
             close()
             return@callbackFlow
         }
 
-        val docRef = usersCollection.document(userId)
+        val docRef = usersCollection!!.document(userId)
         val listener = docRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 close(error)
@@ -124,8 +130,8 @@ class FirestoreUserProfileRepository(
 
     override suspend fun fetchUser(userId: String): Result<User?> {
         return try {
-            if (userId.isBlank()) return Result.success(null)
-            val doc = usersCollection.document(userId).get().await()
+            if (userId.isBlank() || usersCollection == null) return Result.success(null)
+            val doc = usersCollection!!.document(userId).get().await()
             if (doc.exists() && doc.data != null) {
                 Result.success(FirestoreUser.fromMap(doc.id, doc.data!!))
             } else {
@@ -138,13 +144,14 @@ class FirestoreUserProfileRepository(
 
     override suspend fun createOrUpdateUser(user: User): Result<Unit> {
         return try {
+            if (usersCollection == null) return Result.failure(Exception("Firestore not initialized"))
             val userMap = user.toMap().toMutableMap()
             if (user.createdAt.isBlank()) {
                 userMap["createdAt"] = getCurrentIsoTimestamp()
             }
             userMap["lastLoginAt"] = getCurrentIsoTimestamp()
 
-            usersCollection.document(user.userId)
+            usersCollection!!.document(user.userId)
                 .set(userMap, SetOptions.merge())
                 .await()
             Result.success(Unit)
@@ -155,7 +162,8 @@ class FirestoreUserProfileRepository(
 
     override suspend fun updateUserFcmToken(userId: String, token: String): Result<Unit> {
         return try {
-            usersCollection.document(userId)
+            if (usersCollection == null) return Result.failure(Exception("Firestore not initialized"))
+            usersCollection!!.document(userId)
                 .update("fcmToken", token)
                 .await()
             Result.success(Unit)
@@ -166,7 +174,8 @@ class FirestoreUserProfileRepository(
 
     override suspend fun updateLastLogin(userId: String): Result<Unit> {
         return try {
-            usersCollection.document(userId)
+            if (usersCollection == null) return Result.failure(Exception("Firestore not initialized"))
+            usersCollection!!.document(userId)
                 .update("lastLoginAt", getCurrentIsoTimestamp())
                 .await()
             Result.success(Unit)
@@ -177,10 +186,13 @@ class FirestoreUserProfileRepository(
 
     override suspend fun deleteUser(userId: String): Result<Unit> {
         return try {
+            if (firestore == null || usersCollection == null || profilesCollection == null) {
+                return Result.failure(Exception("Firestore not initialized"))
+            }
             // Delete user doc and linked business profile in a batch transaction
-            val batch = firestore.batch()
-            batch.delete(usersCollection.document(userId))
-            batch.delete(profilesCollection.document(userId))
+            val batch = firestore!!.batch()
+            batch.delete(usersCollection!!.document(userId))
+            batch.delete(profilesCollection!!.document(userId))
             batch.commit().await()
             Result.success(Unit)
         } catch (e: Exception) {
@@ -193,13 +205,13 @@ class FirestoreUserProfileRepository(
     // ==========================================
 
     override fun getBusinessProfileFlow(userId: String): Flow<BusinessProfile?> = callbackFlow {
-        if (userId.isBlank()) {
+        if (userId.isBlank() || profilesCollection == null) {
             trySend(null)
             close()
             return@callbackFlow
         }
 
-        val docRef = profilesCollection.document(userId)
+        val docRef = profilesCollection!!.document(userId)
         val listener = docRef.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 close(error)
@@ -218,8 +230,8 @@ class FirestoreUserProfileRepository(
 
     override suspend fun fetchBusinessProfile(userId: String): Result<BusinessProfile?> {
         return try {
-            if (userId.isBlank()) return Result.success(null)
-            val doc = profilesCollection.document(userId).get().await()
+            if (userId.isBlank() || profilesCollection == null) return Result.success(null)
+            val doc = profilesCollection!!.document(userId).get().await()
             if (doc.exists() && doc.data != null) {
                 Result.success(FirestoreBusinessProfile.fromMap(doc.id, doc.data!!))
             } else {
@@ -232,6 +244,7 @@ class FirestoreUserProfileRepository(
 
     override suspend fun createOrUpdateBusinessProfile(profile: BusinessProfile): Result<Unit> {
         return try {
+            if (profilesCollection == null) return Result.failure(Exception("Firestore not initialized"))
             val now = getCurrentIsoTimestamp()
             val profileMap = profile.toMap().toMutableMap()
             if (profile.createdAt.isBlank()) {
@@ -239,7 +252,7 @@ class FirestoreUserProfileRepository(
             }
             profileMap["updatedAt"] = now
 
-            profilesCollection.document(profile.userId)
+            profilesCollection!!.document(profile.userId)
                 .set(profileMap, SetOptions.merge())
                 .await()
             Result.success(Unit)
@@ -258,6 +271,7 @@ class FirestoreUserProfileRepository(
         legalForms: List<String>
     ): Result<Unit> {
         return try {
+            if (profilesCollection == null) return Result.failure(Exception("Firestore not initialized"))
             val updates = mapOf(
                 "targetSectors" to sectors,
                 "targetKads" to kads,
@@ -268,7 +282,7 @@ class FirestoreUserProfileRepository(
                 "updatedAt" to getCurrentIsoTimestamp()
             )
 
-            profilesCollection.document(userId)
+            profilesCollection!!.document(userId)
                 .set(updates, SetOptions.merge())
                 .await()
             Result.success(Unit)
@@ -285,6 +299,7 @@ class FirestoreUserProfileRepository(
         pushNotifications: Boolean
     ): Result<Unit> {
         return try {
+            if (profilesCollection == null) return Result.failure(Exception("Firestore not initialized"))
             val updates = mapOf(
                 "notificationTime" to notificationTime,
                 "dailySummaryEnabled" to dailySummaryEnabled,
@@ -293,7 +308,7 @@ class FirestoreUserProfileRepository(
                 "updatedAt" to getCurrentIsoTimestamp()
             )
 
-            profilesCollection.document(userId)
+            profilesCollection!!.document(userId)
                 .set(updates, SetOptions.merge())
                 .await()
             Result.success(Unit)
@@ -304,7 +319,8 @@ class FirestoreUserProfileRepository(
 
     override suspend fun deleteBusinessProfile(userId: String): Result<Unit> {
         return try {
-            profilesCollection.document(userId).delete().await()
+            if (profilesCollection == null) return Result.failure(Exception("Firestore not initialized"))
+            profilesCollection!!.document(userId).delete().await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -379,9 +395,13 @@ class FirestoreUserProfileRepository(
                 updatedAt = now
             )
 
-            val batch = firestore.batch()
-            batch.set(usersCollection.document(userId), user.toMap(), SetOptions.merge())
-            batch.set(profilesCollection.document(userId), profile.toMap(), SetOptions.merge())
+            if (firestore == null || usersCollection == null || profilesCollection == null) {
+                return Result.failure(Exception("Firestore not initialized"))
+            }
+
+            val batch = firestore!!.batch()
+            batch.set(usersCollection!!.document(userId), user.toMap(), SetOptions.merge())
+            batch.set(profilesCollection!!.document(userId), profile.toMap(), SetOptions.merge())
             batch.commit().await()
 
             Result.success(UserAccountWithBusinessProfile(user = user, businessProfile = profile))

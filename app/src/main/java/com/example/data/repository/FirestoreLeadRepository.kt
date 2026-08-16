@@ -85,18 +85,29 @@ interface IFirestoreLeadRepository {
 /**
  * Production Repository implementation interacting with Cloud Firestore.
  */
-class FirestoreLeadRepository(
-    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
-) : IFirestoreLeadRepository {
+class FirestoreLeadRepository() : IFirestoreLeadRepository {
 
-    private val leadsCollection = firestore.collection(FirestoreCollections.GEMI_DAILY_LEADS)
-    private val profilesCollection = firestore.collection(FirestoreCollections.BUSINESS_PROFILES)
+    private val firestore: FirebaseFirestore? by lazy {
+        try {
+            FirebaseFirestore.getInstance()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private val leadsCollection by lazy { firestore?.collection(FirestoreCollections.GEMI_DAILY_LEADS) }
+    private val profilesCollection by lazy { firestore?.collection(FirestoreCollections.BUSINESS_PROFILES) }
 
     /**
      * Real-time stream of all Greece leads matching the specified filters.
      */
     override fun getAllGreeceLeadsFlow(filter: LeadFeedFilter): Flow<List<GemiLead>> = callbackFlow {
-        var query: Query = leadsCollection
+        if (leadsCollection == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        var query: Query = leadsCollection!!
 
         // Server-side Firestore indexed filtering where possible
         if (!filter.region.isNullOrBlank() && filter.region != "Όλη η Ελλάδα") {
@@ -157,7 +168,8 @@ class FirestoreLeadRepository(
      */
     override suspend fun fetchAllGreeceLeads(filter: LeadFeedFilter): Result<List<GemiLead>> {
         return try {
-            var query: Query = leadsCollection
+            if (leadsCollection == null) return Result.success(emptyList())
+            var query: Query = leadsCollection!!
 
             if (!filter.region.isNullOrBlank() && filter.region != "Όλη η Ελλάδα") {
                 query = query.whereEqualTo("region", filter.region)
@@ -245,7 +257,7 @@ class FirestoreLeadRepository(
      * Queries leads matching any of the specified KAD codes.
      */
     override fun getLeadsByKadFlow(kadCodes: List<String>): Flow<List<GemiLead>> = callbackFlow {
-        if (kadCodes.isEmpty()) {
+        if (kadCodes.isEmpty() || leadsCollection == null) {
             trySend(emptyList())
             close()
             return@callbackFlow
@@ -253,7 +265,7 @@ class FirestoreLeadRepository(
 
         // Firestore supports 'whereIn' for up to 10 items
         val chunks = kadCodes.take(10)
-        val query = leadsCollection.whereIn("primaryKad", chunks)
+        val query = leadsCollection!!.whereIn("primaryKad", chunks)
 
         val registration = query.addSnapshotListener { snapshot, error ->
             if (error != null) {
@@ -273,7 +285,12 @@ class FirestoreLeadRepository(
      * Queries leads for a specific registration date (YYYY-MM-DD).
      */
     override fun getLeadsByDateFlow(date: String): Flow<List<GemiLead>> = callbackFlow {
-        val query = leadsCollection.whereEqualTo("registrationDate", date)
+        if (leadsCollection == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+        val query = leadsCollection!!.whereEqualTo("registrationDate", date)
         val registration = query.addSnapshotListener { snapshot, error ->
             if (error != null) {
                 close(error)
@@ -292,7 +309,8 @@ class FirestoreLeadRepository(
      */
     override suspend fun getLeadByGemiNumber(gemiNumber: String): Result<GemiLead?> {
         return try {
-            val doc = leadsCollection.document(gemiNumber).get().await()
+            if (leadsCollection == null) return Result.success(null)
+            val doc = leadsCollection!!.document(gemiNumber).get().await()
             if (doc.exists() && doc.data != null) {
                 Result.success(FirestoreGemiDailyLead.fromMap(doc.id, doc.data!!))
             } else {
@@ -389,7 +407,10 @@ class FirestoreLeadRepository(
         userProfile: UserProfileEntity?
     ): SyncResult {
         return try {
-            val snapshot = leadsCollection
+            if (leadsCollection == null) {
+                return SyncResult(success = false, newLeadsCount = 0, totalLeadsCount = 0, message = "Firestore not initialized")
+            }
+            val snapshot = leadsCollection!!
                 .orderBy("ingestedAt", Query.Direction.DESCENDING)
                 .limit(100)
                 .get()
@@ -441,7 +462,8 @@ class FirestoreLeadRepository(
      */
     override suspend fun publishLeadToFirestore(lead: GemiLead): Result<Unit> {
         return try {
-            leadsCollection.document(lead.gemiNumber).set(lead.toMap()).await()
+            if (leadsCollection == null) return Result.failure(Exception("Firestore not initialized"))
+            leadsCollection!!.document(lead.gemiNumber).set(lead.toMap()).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -453,10 +475,11 @@ class FirestoreLeadRepository(
      */
     override suspend fun publishBatchLeadsToFirestore(leads: List<GemiLead>): Result<Int> {
         return try {
+            if (firestore == null || leadsCollection == null) return Result.failure(Exception("Firestore not initialized"))
             var count = 0
-            val batch = firestore.batch()
+            val batch = firestore!!.batch()
             for (lead in leads) {
-                val ref = leadsCollection.document(lead.gemiNumber)
+                val ref = leadsCollection!!.document(lead.gemiNumber)
                 batch.set(ref, lead.toMap())
                 count++
             }

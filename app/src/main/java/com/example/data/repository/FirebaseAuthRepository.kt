@@ -102,9 +102,17 @@ interface IAuthRepository {
  * Production implementation of Firebase Authentication integrated with Firestore 'users' & 'business_profiles'.
  */
 class FirebaseAuthRepository(
-    private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance(),
+    firebaseAuthIn: FirebaseAuth? = null,
     private val userProfileRepo: IFirestoreUserProfileRepository = FirestoreUserProfileRepository()
 ) : IAuthRepository {
+
+    private val firebaseAuth: FirebaseAuth? by lazy {
+        firebaseAuthIn ?: try {
+            FirebaseAuth.getInstance()
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     private fun getCurrentIsoTimestamp(): String {
         return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
@@ -116,13 +124,18 @@ class FirebaseAuthRepository(
      * Real-time stream of Firebase Authentication state changes.
      */
     override val authStateFlow: Flow<FirebaseUser?> = callbackFlow {
+        if (firebaseAuth == null) {
+            trySend(null)
+            close()
+            return@callbackFlow
+        }
         val authStateListener = FirebaseAuth.AuthStateListener { auth ->
             trySend(auth.currentUser)
         }
-        firebaseAuth.addAuthStateListener(authStateListener)
+        firebaseAuth!!.addAuthStateListener(authStateListener)
         // Emit initial value
-        trySend(firebaseAuth.currentUser)
-        awaitClose { firebaseAuth.removeAuthStateListener(authStateListener) }
+        trySend(firebaseAuth!!.currentUser)
+        awaitClose { firebaseAuth!!.removeAuthStateListener(authStateListener) }
     }.distinctUntilChanged()
 
     /**
@@ -156,11 +169,11 @@ class FirebaseAuthRepository(
         }
     }
 
-    override fun isUserSignedIn(): Boolean = firebaseAuth.currentUser != null
+    override fun isUserSignedIn(): Boolean = firebaseAuth?.currentUser != null
 
-    override fun getCurrentUserId(): String? = firebaseAuth.currentUser?.uid
+    override fun getCurrentUserId(): String? = firebaseAuth?.currentUser?.uid
 
-    override fun getCurrentFirebaseUser(): FirebaseUser? = firebaseAuth.currentUser
+    override fun getCurrentFirebaseUser(): FirebaseUser? = firebaseAuth?.currentUser
 
     /**
      * Signs up a new subscriber with Email & Password.
@@ -176,7 +189,8 @@ class FirebaseAuthRepository(
         initialProfile: BusinessProfile?
     ): Result<AuthResult> {
         return try {
-            val authResult = firebaseAuth.createUserWithEmailAndPassword(email.trim(), password).await()
+            if (firebaseAuth == null) return Result.failure(Exception("FirebaseAuth not initialized"))
+            val authResult = firebaseAuth!!.createUserWithEmailAndPassword(email.trim(), password).await()
             val fbUser = authResult.user ?: throw IllegalStateException("Firebase user creation returned null")
 
             if (displayName.isNotBlank()) {
@@ -229,7 +243,8 @@ class FirebaseAuthRepository(
         password: String
     ): Result<AuthResult> {
         return try {
-            val authResult = firebaseAuth.signInWithEmailAndPassword(email.trim(), password).await()
+            if (firebaseAuth == null) return Result.failure(Exception("FirebaseAuth not initialized"))
+            val authResult = firebaseAuth!!.signInWithEmailAndPassword(email.trim(), password).await()
             val fbUser = authResult.user ?: throw IllegalStateException("Firebase sign in returned null")
 
             // Update user last login timestamp in Firestore
@@ -286,8 +301,9 @@ class FirebaseAuthRepository(
         initialProfile: BusinessProfile?
     ): Result<AuthResult> {
         return try {
+            if (firebaseAuth == null) return Result.failure(Exception("FirebaseAuth not initialized"))
             val credential = GoogleAuthProvider.getCredential(idToken, null)
-            val authResult = firebaseAuth.signInWithCredential(credential).await()
+            val authResult = firebaseAuth!!.signInWithCredential(credential).await()
             val fbUser = authResult.user ?: throw IllegalStateException("Firebase Google Sign-In returned null")
 
             // Fetch or provision joined User & Business Profile
@@ -395,7 +411,7 @@ class FirebaseAuthRepository(
      */
     override suspend fun signOut(context: Context?) {
         try {
-            firebaseAuth.signOut()
+            firebaseAuth?.signOut()
             if (context != null) {
                 val credentialManager = CredentialManager.create(context)
                 credentialManager.clearCredentialState(ClearCredentialStateRequest())
@@ -410,7 +426,8 @@ class FirebaseAuthRepository(
      */
     override suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
         return try {
-            firebaseAuth.sendPasswordResetEmail(email.trim()).await()
+            if (firebaseAuth == null) return Result.failure(Exception("FirebaseAuth not initialized"))
+            firebaseAuth!!.sendPasswordResetEmail(email.trim()).await()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -422,7 +439,8 @@ class FirebaseAuthRepository(
      */
     override suspend fun updateDisplayName(displayName: String): Result<Unit> {
         return try {
-            val fbUser = firebaseAuth.currentUser ?: throw IllegalStateException("Χρήστης μη συνδεδεμένος")
+            if (firebaseAuth == null) return Result.failure(Exception("FirebaseAuth not initialized"))
+            val fbUser = firebaseAuth!!.currentUser ?: throw IllegalStateException("Χρήστης μη συνδεδεμένος")
             val profileUpdates = UserProfileChangeRequest.Builder()
                 .setDisplayName(displayName)
                 .build()
@@ -443,7 +461,8 @@ class FirebaseAuthRepository(
      */
     override suspend fun deleteAccount(): Result<Unit> {
         return try {
-            val fbUser = firebaseAuth.currentUser ?: throw IllegalStateException("Χρήστης μη συνδεδεμένος")
+            if (firebaseAuth == null) return Result.failure(Exception("FirebaseAuth not initialized"))
+            val fbUser = firebaseAuth!!.currentUser ?: throw IllegalStateException("Χρήστης μη συνδεδεμένος")
             val uid = fbUser.uid
 
             // Clean up Firestore documents first

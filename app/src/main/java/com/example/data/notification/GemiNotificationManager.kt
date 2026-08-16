@@ -85,8 +85,10 @@ object GemiNotificationManager {
     fun syncFcmTokenWithFirestore(userId: String? = null) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val token = FirebaseMessaging.getInstance().token.await()
-                val currentUid = userId ?: FirebaseAuth.getInstance().currentUser?.uid
+                val messaging = FirebaseMessaging.getInstance()
+                val token = messaging.token.await()
+                val auth = FirebaseAuth.getInstance()
+                val currentUid = userId ?: auth.currentUser?.uid
 
                 if (!currentUid.isNullOrBlank() && token.isNotBlank()) {
                     val userProfileRepo = FirestoreUserProfileRepository()
@@ -94,7 +96,7 @@ object GemiNotificationManager {
                 }
 
                 // Subscribe to universal broadcast topic for daily morning GEMI syncs
-                FirebaseMessaging.getInstance().subscribeToTopic("gemi_daily_ingestion_updates").await()
+                messaging.subscribeToTopic("gemi_daily_ingestion_updates").await()
             } catch (e: Exception) {
                 // Token fetch / subscription failed gracefully (e.g. offline or unconfigured services)
             }

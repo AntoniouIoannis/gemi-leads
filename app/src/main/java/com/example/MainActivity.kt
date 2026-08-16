@@ -20,7 +20,7 @@ class MainActivity : ComponentActivity() {
   private val leadViewModel: LeadViewModel by viewModels()
 
   private val requestPermissionLauncher = registerForActivityResult(
-    ActivityResultContracts.RequestPermission()
+    ActivityResultContracts.RequestPermission(),
   ) { isGranted: Boolean ->
     if (isGranted) {
       GemiNotificationManager.syncFcmTokenWithFirestore()

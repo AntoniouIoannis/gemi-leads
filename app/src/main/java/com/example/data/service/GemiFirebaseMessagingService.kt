@@ -23,11 +23,15 @@ class GemiFirebaseMessagingService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
 
-        val currentUid = FirebaseAuth.getInstance().currentUser?.uid
-        if (!currentUid.isNullOrBlank()) {
-            CoroutineScope(Dispatchers.IO).launch {
-                userProfileRepo.updateUserFcmToken(currentUid, token)
+        try {
+            val currentUid = FirebaseAuth.getInstance().currentUser?.uid
+            if (!currentUid.isNullOrBlank()) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    userProfileRepo.updateUserFcmToken(currentUid, token)
+                }
             }
+        } catch (e: Exception) {
+            // Firebase not initialized
         }
     }
 

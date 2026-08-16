@@ -15,7 +15,7 @@ data class SyncResult(
     val totalLeadsCount: Int,
     val message: String,
     val isRateLimited: Boolean = false,
-    val rateLimitRemainingMs: Long = 0L
+    val rateLimitRemainingMs: Long = 0L,
 )
 
 class GemiSyncEngine(
@@ -51,14 +51,13 @@ class GemiSyncEngine(
         }
 
         // 2. Attempt rate-limited live fetch from GEMI Open Data API
-        var liveFetchSuccess = false
         var apiMessage = "Seed data ingested successfully."
 
         try {
             throttleRateLimit()
             val response = apiService.getRecentCompanies(limit = 20)
             val remoteItems = response.data ?: response.items
-            if (remoteItems != null && remoteItems.isNotEmpty()) {
+            if (!remoteItems.isNullOrEmpty()) {
                 remoteItems.forEach { item ->
                     val gemi = item.gemiNumber ?: ""
                     if (gemi.isNotEmpty() && !existingGemiNumbers.contains(gemi)) {
@@ -85,10 +84,9 @@ class GemiSyncEngine(
                         allIncoming.add(scoreLead(mapped, userProfile))
                     }
                 }
-                liveFetchSuccess = true
                 apiMessage = "Live GEMI Open Data synced (${remoteItems.size} entities checked)."
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // Graceful fallback to rich offline data
             apiMessage = "GEMI Live API rate-limit queue active (8 req/min). Using verified registry dataset."
         }

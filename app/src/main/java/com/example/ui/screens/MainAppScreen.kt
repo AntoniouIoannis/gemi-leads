@@ -1,7 +1,6 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -77,7 +76,7 @@ import com.example.ui.theme.NaturalSurfaceVariant
 @Composable
 fun MainAppScreen(
     viewModel: LeadViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val userProfile by viewModel.userProfile.collectAsState()
     val matchedLeads by viewModel.matchedLeads.collectAsState()
@@ -96,7 +95,7 @@ fun MainAppScreen(
     val selectedRegion by viewModel.selectedRegionFilter.collectAsState()
 
     // If onboarding not completed, show Onboarding Wizard
-    if (userProfile == null || !userProfile!!.isOnboardingCompleted) {
+    if ((userProfile == null) || !(userProfile!!.isOnboardingCompleted)) {
         OnboardingScreen(
             onComplete = { compName, ownGemi, bType, sectors, kads, isPan, regions, goal ->
                 viewModel.completeOnboarding(
@@ -191,7 +190,7 @@ fun MainAppScreen(
                             badge = {
                                 if (matchedLeads.isNotEmpty()) {
                                     Badge(containerColor = NaturalPrimary, contentColor = Color.White) {
-                                        Text("${matchedLeads.size}", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        Text(matchedLeads.size.toString(), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -243,7 +242,7 @@ fun MainAppScreen(
                             badge = {
                                 if (pipelineLeads.isNotEmpty()) {
                                     Badge(containerColor = NaturalSecondary, contentColor = Color.White) {
-                                        Text("${pipelineLeads.size}", fontSize = 10.sp)
+                                        Text(pipelineLeads.size.toString(), fontSize = 10.sp)
                                     }
                                 }
                             }

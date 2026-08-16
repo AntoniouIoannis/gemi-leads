@@ -32,9 +32,6 @@ class LeadViewModel(application: Application) : AndroidViewModel(application) {
     val allLeadsRaw: StateFlow<List<LeadEntity>> = leadRepo.allLeads
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val savedLeads: StateFlow<List<LeadEntity>> = leadRepo.savedLeads
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     // Search and Filters for All Feed
     val searchQuery = MutableStateFlow("")
     val selectedLegalFormFilter = MutableStateFlow<String?>(null)
@@ -47,7 +44,7 @@ class LeadViewModel(application: Application) : AndroidViewModel(application) {
         searchQuery,
         selectedLegalFormFilter,
         selectedRegionFilter,
-        selectedSectorFilter
+        selectedSectorFilter,
     ) { leads, query, legalForm, region, sector ->
         leads.filter { lead ->
             val matchesQuery = query.isBlank() ||
@@ -59,7 +56,7 @@ class LeadViewModel(application: Application) : AndroidViewModel(application) {
                 lead.municipality.contains(query, ignoreCase = true) ||
                 lead.region.contains(query, ignoreCase = true)
 
-            val matchesLegalForm = legalForm == null || lead.legalForm.equals(legalForm, ignoreCase = true)
+            val matchesLegalForm = (legalForm == null) || lead.legalForm.equals(legalForm, ignoreCase = true)
             val matchesRegion = region == null || lead.region.contains(region, ignoreCase = true)
             val matchesSector = sector == null || lead.sector.equals(sector, ignoreCase = true)
 
@@ -69,7 +66,8 @@ class LeadViewModel(application: Application) : AndroidViewModel(application) {
 
     // Matched Leads (Sorted by match score)
     val matchedLeads: StateFlow<List<LeadEntity>> = allLeadsRaw.combine(searchQuery) { leads, query ->
-        leads.filter { it.matchScore >= 45 }
+        leads.asSequence()
+            .filter { it.matchScore >= 45 }
             .filter { lead ->
                 query.isBlank() ||
                     lead.companyName.contains(query, ignoreCase = true) ||
@@ -78,6 +76,7 @@ class LeadViewModel(application: Application) : AndroidViewModel(application) {
                     lead.region.contains(query, ignoreCase = true)
             }
             .sortedByDescending { it.matchScore }
+            .toList()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Pipeline Leads
@@ -89,7 +88,7 @@ class LeadViewModel(application: Application) : AndroidViewModel(application) {
     // UI Navigation & Dialog States
     val selectedTab = MutableStateFlow(0) // 0: Matches, 1: Live Feed, 2: Pipeline CRM, 3: Settings
     val selectedLeadDetail = MutableStateFlow<LeadEntity?>(null)
-    val isSyncing = MutableStateFlow(false)
+    val isSyncing = MutableStateFlow(value = false)
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
     val showBackendArchitectureModal = MutableStateFlow(false)
@@ -213,39 +212,14 @@ class LeadViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val lead = allLeadsRaw.value.firstOrNull { it.gemiNumber == gemiNumber }
                 ?: leadRepo.allLeads.firstOrNull()?.firstOrNull { it.gemiNumber == gemiNumber }
-            if (lead != null) {
-                selectedLeadDetail.value = lead
+            lead?.let {
+                selectedLeadDetail.value = it
             }
         }
     }
 
-    fun clearSyncMessage() {
-        _syncMessage.value = null
-    }
-
     fun exportCsv(leads: List<LeadEntity>): String {
         return leadRepo.exportLeadsToCsv(leads)
-    }
-
-    fun shareLeadsCsv(context: android.content.Context, leads: List<LeadEntity>, prefix: String = "gemi_leads") {
-        val result = com.example.data.export.GemiCsvExporter.shareCsvFile(
-            context = context,
-            leads = leads,
-            chooserTitle = "Εξαγωγή Leads σε CSV (${leads.size} επιχειρήσεις)",
-            filePrefix = prefix
-        )
-        if (result.isFailure) {
-            _syncMessage.value = "Σφάλμα εξαγωγής CSV: ${result.exceptionOrNull()?.message}"
-        }
-    }
-
-    fun saveCsvToUri(context: android.content.Context, uri: android.net.Uri, leads: List<LeadEntity>) {
-        val result = com.example.data.export.GemiCsvExporter.writeCsvToUri(context, uri, leads)
-        if (result.isSuccess) {
-            _syncMessage.value = "Επιτυχής εξαγωγή ${result.getOrNull()} Leads σε αρχείο CSV!"
-        } else {
-            _syncMessage.value = "Σφάλμα αποθήκευσης CSV: ${result.exceptionOrNull()?.message}"
-        }
     }
 
     fun selectLeadForDetail(lead: LeadEntity?) {
