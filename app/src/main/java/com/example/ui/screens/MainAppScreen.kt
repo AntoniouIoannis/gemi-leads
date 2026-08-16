@@ -337,7 +337,8 @@ fun MainAppScreen(
                         viewModel.updateTargetPreferences(sectors, kads, isPan, regions)
                     },
                     onOpenBackendSpecs = { viewModel.showBackendArchitectureModal.value = true },
-                    onTriggerSync = { viewModel.triggerSync() }
+                    onTriggerSync = { viewModel.triggerSync() },
+                    onTestNotification = { viewModel.triggerTestNotification() }
                 )
             }
         }

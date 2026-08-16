@@ -57,6 +57,9 @@ interface LeadDao {
     @Query("SELECT COUNT(*) FROM leads")
     fun getLeadCount(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM leads")
+    suspend fun getLeadCountSync(): Int
+
     @Query("SELECT COUNT(*) FROM leads WHERE isSaved = 1")
     fun getSavedCount(): Flow<Int>
 }

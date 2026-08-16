@@ -3,6 +3,7 @@ package com.example.data.repository
 import com.example.data.local.dao.LeadDao
 import com.example.data.local.entity.LeadEntity
 import com.example.data.local.entity.UserProfileEntity
+import com.example.data.model.GemiLead
 import com.example.data.model.PipelineStatus
 import com.example.data.sync.GemiSyncEngine
 import com.example.data.sync.SyncResult
@@ -12,7 +13,8 @@ import kotlinx.coroutines.flow.map
 
 class LeadRepository(
     private val leadDao: LeadDao,
-    private val syncEngine: GemiSyncEngine = GemiSyncEngine()
+    private val syncEngine: GemiSyncEngine = GemiSyncEngine(),
+    val firestoreRepo: IFirestoreLeadRepository = FirestoreLeadRepository()
 ) {
     val allLeads: Flow<List<LeadEntity>> = leadDao.getAllLeads()
     val savedLeads: Flow<List<LeadEntity>> = leadDao.getSavedLeads()
@@ -31,6 +33,21 @@ class LeadRepository(
         return leadDao.searchLeads(query)
     }
 
+    /**
+     * Real-time stream of 'All Greece' leads directly from Firestore.
+     */
+    fun getFirestoreAllGreeceFeed(filter: LeadFeedFilter = LeadFeedFilter()): Flow<List<GemiLead>> {
+        return firestoreRepo.getAllGreeceLeadsFlow(filter)
+    }
+
+    /**
+     * Real-time stream of 'My Matches' leads directly from Firestore.
+     */
+    fun getFirestoreMyMatchesFeed(profile: UserProfileEntity, minScore: Int = 45): Flow<List<MatchedGemiLead>> {
+        val businessProfile = com.example.data.model.FirestoreBusinessProfile.fromLocalEntity(profile)
+        return firestoreRepo.getMyMatchesFlow(businessProfile, minScore)
+    }
+
     suspend fun toggleSaved(gemiNumber: String, isCurrentlySaved: Boolean) {
         leadDao.updateSavedStatus(gemiNumber, !isCurrentlySaved)
     }
@@ -44,6 +61,13 @@ class LeadRepository(
     }
 
     suspend fun syncLeads(profile: UserProfileEntity?): SyncResult {
+        // Attempt cloud Firestore synchronization first
+        val firestoreSyncResult = firestoreRepo.syncFirestoreToLocalDb(leadDao, profile)
+        if (firestoreSyncResult.success && firestoreSyncResult.newLeadsCount > 0) {
+            return firestoreSyncResult
+        }
+
+        // Fallback or augment with GEMI Open Data API ingestion
         val current = leadDao.getAllLeads().firstOrNull() ?: emptyList()
         val (incoming, result) = syncEngine.fetchLeadsFromGemi(current, profile)
         if (incoming.isNotEmpty()) {
@@ -68,24 +92,6 @@ class LeadRepository(
     }
 
     fun exportLeadsToCsv(leads: List<LeadEntity>): String {
-        val sb = StringBuilder()
-        sb.append("Αριθμός ΓΕΜΗ,ΑΦΜ,Επωνυμία,Διακριτικός Τίτλος,Νομική Μορφή,Ημερομηνία Σύστασης,Κύριος ΚΑΔ,Περιγραφή ΚΑΔ,Περιφέρεια,Δήμος,Τηλέφωνο,Email,Κατάσταση CRM,Σημειώσεις\n")
-        leads.forEach { lead ->
-            sb.append("\"${lead.gemiNumber}\",")
-            sb.append("\"${lead.afm}\",")
-            sb.append("\"${lead.companyName.replace("\"", "\"\"")}\",")
-            sb.append("\"${lead.tradeName.replace("\"", "\"\"")}\",")
-            sb.append("\"${lead.legalForm}\",")
-            sb.append("\"${lead.registrationDate}\",")
-            sb.append("\"${lead.primaryKad}\",")
-            sb.append("\"${lead.kadDescription.replace("\"", "\"\"")}\",")
-            sb.append("\"${lead.region}\",")
-            sb.append("\"${lead.municipality}\",")
-            sb.append("\"${lead.phone}\",")
-            sb.append("\"${lead.email}\",")
-            sb.append("\"${lead.pipelineStatus.labelGr}\",")
-            sb.append("\"${lead.userNotes.replace("\"", "\"\"")}\"\n")
-        }
-        return sb.toString()
+        return com.example.data.export.GemiCsvExporter.buildCsvString(leads)
     }
 }

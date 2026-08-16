@@ -79,6 +79,7 @@ fun PreferencesScreen(
     onSavePreferences: (sectors: String, kads: String, isPanHellenic: Boolean, regions: String) -> Unit,
     onOpenBackendSpecs: () -> Unit,
     onTriggerSync: () -> Unit,
+    onTestNotification: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -286,6 +287,56 @@ fun PreferencesScreen(
             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color.White)
             Spacer(modifier = Modifier.width(8.dp))
             Text("Αποθήκευση & Επαναϋπολογισμός Match Score", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Firebase Cloud Messaging (FCM) & Push Notifications
+        Text(
+            text = "Firebase Cloud Messaging (FCM) & Ειδοποιήσεις",
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            color = NaturalOnBackground
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F2EB)),
+            border = BorderStroke(1.dp, Color(0xFFE0DBCF)),
+            modifier = Modifier.fillMaxWidth().testTag("fcm_notifications_card")
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Notifications, contentDescription = null, tint = NaturalPrimary, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Ημερήσιες Push Ειδοποιήσεις Νέων Leads",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = NaturalOnBackground
+                    )
+                }
+
+                Text(
+                    text = "Λαμβάνετε αυτόματες πρωινές push ειδοποιήσεις μόλις εντοπιστούν νέες εταιρείες Γ.Ε.ΜΗ. με Match Score ≥ 60% σύμφωνα με τους ΚΑΔ και περιοχές που έχετε ορίσει.",
+                    fontSize = 12.sp,
+                    color = NaturalSecondary,
+                    lineHeight = 16.sp
+                )
+
+                OutlinedButton(
+                    onClick = onTestNotification,
+                    modifier = Modifier.fillMaxWidth().height(42.dp).testTag("trigger_test_notification_btn"),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, NaturalPrimary),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = NaturalPrimary)
+                ) {
+                    Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(16.dp), tint = NaturalPrimary)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Δοκιμή Ημερήσιας Push Ειδοποίησης (FCM Preview)", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))

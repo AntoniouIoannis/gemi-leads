@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BusinessCenter
 import androidx.compose.material.icons.filled.Cached
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Refresh
@@ -152,18 +153,39 @@ fun MyMatchesScreen(
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Search Bar with sync action
+        // Search Bar with sync and CSV action
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+
             AppSearchBar(
                 query = searchQuery,
                 onQueryChange = onSearchQueryChange,
                 placeholderText = "Αναζήτηση στα προτεινόμενα leads...",
                 modifier = Modifier.weight(1f)
             )
+
+            OutlinedButton(
+                onClick = {
+                    com.example.data.export.GemiCsvExporter.shareCsvFile(
+                        context = context,
+                        leads = matchedLeads,
+                        chooserTitle = "Εξαγωγή Προτεινόμενων Leads σε CSV (${matchedLeads.size})",
+                        filePrefix = "gemi_matched_leads"
+                    )
+                },
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, Color(0xFFE0DBCF)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = NaturalPrimary),
+                modifier = Modifier.testTag("matches_export_csv_btn")
+            ) {
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = NaturalPrimary)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("CSV", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = NaturalPrimary)
+            }
 
             IconButton(
                 onClick = onTriggerSync,

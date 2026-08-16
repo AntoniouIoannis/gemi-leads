@@ -106,13 +106,12 @@ fun AllLeadsFeedScreen(
 
             OutlinedButton(
                 onClick = {
-                    val csv = onExportCsv(leads)
-                    val sendIntent = Intent().apply {
-                        action = Intent.ACTION_SEND
-                        putExtra(Intent.EXTRA_TEXT, csv)
-                        type = "text/csv"
-                    }
-                    context.startActivity(Intent.createChooser(sendIntent, "Εξαγωγή Leads σε CSV"))
+                    com.example.data.export.GemiCsvExporter.shareCsvFile(
+                        context = context,
+                        leads = leads,
+                        chooserTitle = "Εξαγωγή Leads σε CSV (${leads.size} επιχειρήσεις)",
+                        filePrefix = "gemi_all_leads"
+                    )
                 },
                 shape = RoundedCornerShape(14.dp),
                 border = BorderStroke(1.dp, Color(0xFFE0DBCF)),
@@ -121,7 +120,7 @@ fun AllLeadsFeedScreen(
             ) {
                 Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp), tint = NaturalPrimary)
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("CSV", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = NaturalPrimary)
+                Text("CSV (${leads.size})", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = NaturalPrimary)
             }
         }
 

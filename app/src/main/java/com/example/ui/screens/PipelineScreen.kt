@@ -101,12 +101,13 @@ fun PipelineScreen(
             .padding(horizontal = 16.dp)
             .testTag("pipeline_screen")
     ) {
-        // Summary Stats Row
+        // Summary Stats Row with CSV export button
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             StatCard(
                 title = "Σε Εξέλιξη",
@@ -124,6 +125,41 @@ fun PipelineScreen(
                 accentColor = Color(0xFF487748),
                 modifier = Modifier.weight(1f)
             )
+        }
+
+        // Export Actions Bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "${displayedLeads.size} CRM Leads (${selectedFilterStatus?.labelGr ?: if (onlySaved) "Αποθηκευμένα" else "Όλα"})",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = NaturalOnBackground
+            )
+
+            OutlinedButton(
+                onClick = {
+                    com.example.data.export.GemiCsvExporter.shareCsvFile(
+                        context = context,
+                        leads = displayedLeads,
+                        chooserTitle = "Εξαγωγή CRM Pipeline Leads (${displayedLeads.size})",
+                        filePrefix = "gemi_crm_pipeline"
+                    )
+                },
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, Color(0xFFE0DBCF)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = NaturalPrimary),
+                modifier = Modifier.height(36.dp).testTag("pipeline_export_csv_btn")
+            ) {
+                Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(15.dp), tint = NaturalPrimary)
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Εξαγωγή CSV", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = NaturalPrimary)
+            }
         }
 
         // Horizontal Status Filter Chips

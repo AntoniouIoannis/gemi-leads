@@ -7,6 +7,7 @@ import com.example.data.local.AppDatabase
 import com.example.data.local.entity.LeadEntity
 import com.example.data.local.entity.UserProfileEntity
 import com.example.data.model.PipelineStatus
+import com.example.data.notification.GemiNotificationManager
 import com.example.data.repository.LeadRepository
 import com.example.data.repository.UserProfileRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -175,6 +177,45 @@ class LeadViewModel(application: Application) : AndroidViewModel(application) {
             val result = leadRepo.syncLeads(profile)
             _syncMessage.value = result.message
             isSyncing.value = false
+
+            // If new matching leads arrived, trigger daily notification
+            if (result.success && result.newLeadsCount > 0) {
+                val matches = allLeadsRaw.value.filter { it.matchScore >= 50 }
+                if (matches.isNotEmpty()) {
+                    GemiNotificationManager.showDailyLeadMatchNotification(
+                        context = getApplication(),
+                        matchingLeads = matches,
+                        userProfile = profile
+                    )
+                }
+            }
+        }
+    }
+
+    fun triggerTestNotification() {
+        viewModelScope.launch {
+            val profile = userProfileRepo.getProfileOnce()
+            val matches = matchedLeads.value.ifEmpty { allLeadsRaw.value.take(3) }
+            if (matches.isNotEmpty()) {
+                GemiNotificationManager.showDailyLeadMatchNotification(
+                    context = getApplication(),
+                    matchingLeads = matches,
+                    userProfile = profile
+                )
+                _syncMessage.value = "Εστάλη δοκιμαστική Push ειδοποίηση με ${matches.size} Leads!"
+            } else {
+                _syncMessage.value = "Δεν βρέθηκαν διαθέσιμα Leads για δοκιμαστική ειδοποίηση."
+            }
+        }
+    }
+
+    fun findAndSelectLeadByGemiNumber(gemiNumber: String) {
+        viewModelScope.launch {
+            val lead = allLeadsRaw.value.firstOrNull { it.gemiNumber == gemiNumber }
+                ?: leadRepo.allLeads.firstOrNull()?.firstOrNull { it.gemiNumber == gemiNumber }
+            if (lead != null) {
+                selectedLeadDetail.value = lead
+            }
         }
     }
 
@@ -184,6 +225,27 @@ class LeadViewModel(application: Application) : AndroidViewModel(application) {
 
     fun exportCsv(leads: List<LeadEntity>): String {
         return leadRepo.exportLeadsToCsv(leads)
+    }
+
+    fun shareLeadsCsv(context: android.content.Context, leads: List<LeadEntity>, prefix: String = "gemi_leads") {
+        val result = com.example.data.export.GemiCsvExporter.shareCsvFile(
+            context = context,
+            leads = leads,
+            chooserTitle = "Εξαγωγή Leads σε CSV (${leads.size} επιχειρήσεις)",
+            filePrefix = prefix
+        )
+        if (result.isFailure) {
+            _syncMessage.value = "Σφάλμα εξαγωγής CSV: ${result.exceptionOrNull()?.message}"
+        }
+    }
+
+    fun saveCsvToUri(context: android.content.Context, uri: android.net.Uri, leads: List<LeadEntity>) {
+        val result = com.example.data.export.GemiCsvExporter.writeCsvToUri(context, uri, leads)
+        if (result.isSuccess) {
+            _syncMessage.value = "Επιτυχής εξαγωγή ${result.getOrNull()} Leads σε αρχείο CSV!"
+        } else {
+            _syncMessage.value = "Σφάλμα αποθήκευσης CSV: ${result.exceptionOrNull()?.message}"
+        }
     }
 
     fun selectLeadForDetail(lead: LeadEntity?) {
