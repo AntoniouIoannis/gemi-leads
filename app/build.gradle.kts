@@ -1,7 +1,9 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import org.gradle.api.JavaVersion.VERSION_17
 
 plugins {
   alias(libs.plugins.android.application)
+  alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
@@ -11,16 +13,19 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk {
+    version = release(35)
+  }
 
   defaultConfig {
-    applicationId = "com.aistudio.gemileads.grb2b"
+    applicationId = "gr.iantoniou.gemileads"
     minSdk = 24
-    targetSdk = 36
+    targetSdk = 35
     versionCode = 1
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    signingConfig = signingConfigs.getByName("debug")
   }
 
   signingConfigs {
@@ -54,19 +59,23 @@ android {
     }
   }
   compileOptions {
-    sourceCompatibility = JavaVersion.VERSION_11
-    targetCompatibility = JavaVersion.VERSION_11
+    sourceCompatibility = VERSION_17
+    targetCompatibility = VERSION_17
+  }
+  kotlinOptions {
+    jvmTarget = "17"
   }
   buildFeatures {
     compose = true
     buildConfig = true
+    viewBinding = false
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
   }
-  buildToolsVersion = "36.0.0"
+  buildToolsVersion = "35.0.0"
   ndkVersion = "27.0.12077973"
 }
 
