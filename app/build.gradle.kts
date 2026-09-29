@@ -1,9 +1,7 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
-import org.gradle.api.JavaVersion.VERSION_17
 
 plugins {
   alias(libs.plugins.android.application)
-  alias(libs.plugins.kotlin.android)
   alias(libs.plugins.kotlin.compose)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
@@ -13,31 +11,28 @@ plugins {
 
 android {
   namespace = "com.example"
-  compileSdk {
-    version = release(35)
-  }
+  compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "gr.iantoniou.gemileads"
+    applicationId = "com.aistudio.gemileads.grb2b"
     minSdk = 24
-    targetSdk = 35
-    versionCode = 1
-    versionName = "1.0"
+    targetSdk = 36
+    versionCode = 2
+    versionName = "1.0.1"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-    signingConfig = signingConfigs.getByName("debug")
   }
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "$rootDir/my-upload-key.jks"
+      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
       storeFile = file(keystorePath)
       storePassword = System.getenv("STORE_PASSWORD")
       keyAlias = "upload"
       keyPassword = System.getenv("KEY_PASSWORD")
     }
     create("debugConfig") {
-      storeFile = file("$rootDir/debug.keystore")
+      storeFile = file("${rootDir}/debug.keystore")
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"
@@ -51,32 +46,21 @@ android {
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       signingConfig = signingConfigs.getByName("release")
     }
-    debug {
-      val debugKeystore = file("$rootDir/debug.keystore")
-      if (debugKeystore.exists()) {
-        signingConfig = signingConfigs.getByName("debugConfig")
-      }
-    }
+    debug { signingConfig = signingConfigs.getByName("debugConfig") }
   }
   compileOptions {
-    sourceCompatibility = VERSION_17
-    targetCompatibility = VERSION_17
-  }
-  kotlinOptions {
-    jvmTarget = "17"
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
   }
   buildFeatures {
     compose = true
     buildConfig = true
-    viewBinding = false
   }
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
     includeInApk = false
     includeInBundle = true
   }
-  buildToolsVersion = "35.0.0"
-  ndkVersion = "27.0.12077973"
 }
 
 // Configure the Secrets Gradle Plugin to use .env and .env.example files

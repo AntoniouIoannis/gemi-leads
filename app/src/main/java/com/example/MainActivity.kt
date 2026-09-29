@@ -32,23 +32,25 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
 
     // 1. Initialize FCM Notification Channels
-    GemiNotificationManager.createNotificationChannels(this)
+    try {
+      GemiNotificationManager.createNotificationChannels(this)
+    } catch (e: Throwable) {
+      // Ignored if notification service unavailable
+    }
 
-    // 2. Request Notification Permission on Android 13+
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-      if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-        != PackageManager.PERMISSION_GRANTED
-      ) {
-        requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-      } else {
-        GemiNotificationManager.syncFcmTokenWithFirestore()
-      }
-    } else {
+    // 2. Safely sync FCM Token in background without blocking UI
+    try {
       GemiNotificationManager.syncFcmTokenWithFirestore()
+    } catch (e: Throwable) {
+      // Offline mode
     }
 
     // 3. Handle push notification deep-link intent
-    handleNotificationIntent(intent)
+    try {
+      handleNotificationIntent(intent)
+    } catch (e: Throwable) {
+      // Intent parsing fallback
+    }
 
     setContent {
       MyApplicationTheme {
